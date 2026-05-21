@@ -88,6 +88,9 @@ export default function AdminPage() {
   }
 
   async function startShow(theme: Theme) {
+    // Deactivate any existing active shows
+    await supabase.from("shows").update({ is_active: false }).eq("is_active", true);
+
     const code = Math.random().toString(36).substring(2, 8).toUpperCase();
     const { data } = await supabase
       .from("shows")
@@ -99,7 +102,8 @@ export default function AdminPage() {
       setAnswers([]);
       setScript("");
       setTab("answers");
-      const url = `${window.location.origin}/show/${code}`;
+      // QR always points to the fixed /show URL — same code every show
+      const url = `${window.location.origin}/show`;
       const qr = await QRCode.toDataURL(url, { width: 300, margin: 2 });
       setQrUrl(qr);
     }
@@ -205,7 +209,7 @@ export default function AdminPage() {
             {qrUrl && (
               <div className="flex flex-col items-center gap-2">
                 <img src={qrUrl} alt="QR Code" className="w-28 h-28 rounded-xl" />
-                <p className="text-xs text-gray-500">/show/{activeShow.code}</p>
+                <p className="text-xs text-gray-500">show.metincelik.net/show</p>
               </div>
             )}
           </div>

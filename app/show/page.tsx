@@ -4,8 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { Show, Question } from "@/lib/supabase";
 
-export default function ShowPage({ params }: { params: Promise<{ code: string }> }) {
-  const [code, setCode] = useState<string>("");
+export default function ShowPage() {
   const [show, setShow] = useState<Show | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [answers, setAnswers] = useState<Record<number, string>>({});
@@ -15,20 +14,17 @@ export default function ShowPage({ params }: { params: Promise<{ code: string }>
   const [error, setError] = useState("");
 
   useEffect(() => {
-    params.then((p) => setCode(p.code));
-  }, [params]);
-
-  useEffect(() => {
-    if (!code) return;
     async function load() {
       const { data: showData } = await supabase
         .from("shows")
         .select("*, themes(*)")
-        .eq("code", code)
+        .eq("is_active", true)
+        .order("created_at", { ascending: false })
+        .limit(1)
         .single();
 
-      if (!showData || !showData.is_active) {
-        setError("This show is not active.");
+      if (!showData) {
+        setError("No active show right now — check back soon!");
         setLoading(false);
         return;
       }
@@ -45,7 +41,7 @@ export default function ShowPage({ params }: { params: Promise<{ code: string }>
       setLoading(false);
     }
     load();
-  }, [code]);
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -86,8 +82,9 @@ export default function ShowPage({ params }: { params: Promise<{ code: string }>
 
   if (error && !show) {
     return (
-      <div className="flex items-center justify-center min-h-screen px-6">
-        <p className="text-red-400 text-center text-lg">{error}</p>
+      <div className="flex flex-col items-center justify-center min-h-screen px-6 text-center gap-4">
+        <div className="text-5xl">🎤</div>
+        <p className="text-gray-400 text-lg">{error}</p>
       </div>
     );
   }
