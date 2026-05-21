@@ -121,7 +121,7 @@ RULES:
 - Every word of yours must either set up a punchline or land one. No filler, no transitions that don't add to the joke.
 - NO stage directions. NO "(pause)". NO act-out notes. NO parentheticals.
 - Spoken voice — this is read aloud exactly as written.
-- Build to an absurd escalation. The last answer should feel like the biggest moment.
+- You may reorder the answers for comedic flow. Save the funniest or most absurd answer for last. Build the arc: warm up → escalate → biggest punchline at the end.
 
 SELECTED ANSWERS:
 ${scriptQA}
