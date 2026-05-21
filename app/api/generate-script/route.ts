@@ -72,7 +72,7 @@ ${qaBlock}
 
 Now write the complete script in the format described above.`;
 
-  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
   let content: string;
   try {
     const result = await model.generateContent(prompt);

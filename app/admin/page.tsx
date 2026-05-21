@@ -14,6 +14,7 @@ export default function AdminPage() {
 
   const [themes, setThemes] = useState<Theme[]>([]);
   const [activeShow, setActiveShow] = useState<Show | null>(null);
+  const [questions, setQuestions] = useState<Question[]>([]);
   const [answers, setAnswers] = useState<AnswerWithQuestion[]>([]);
   const [script, setScript] = useState("");
   const [generating, setGenerating] = useState(false);
@@ -21,6 +22,13 @@ export default function AdminPage() {
   const [qrUrl, setQrUrl] = useState("");
   const [tab, setTab] = useState<"answers" | "script">("answers");
   const [bestPicks, setBestPicks] = useState<Record<number, string[]>>({});
+
+  const [pasteMode, setPasteMode] = useState(false);
+  const [pasteText, setPasteText] = useState("");
+  const [pasteError, setPasteError] = useState("");
+  const [pasteImporting, setPasteImporting] = useState(false);
+  const [pasteSuccess, setPasteSuccess] = useState("");
+
   const scriptRef = useRef<HTMLDivElement>(null);
   const answersRef = useRef<HTMLDivElement>(null);
 
@@ -36,6 +44,13 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (!activeShow) return;
+
+    supabase
+      .from("questions")
+      .select("*")
+      .eq("theme_id", activeShow.theme_id)
+      .order("order_num")
+      .then(({ data }) => setQuestions(data ?? []));
 
     supabase
       .from("answers")
@@ -97,9 +112,13 @@ export default function AdminPage() {
     if (data) {
       setActiveShow(data);
       setAnswers([]);
+      setQuestions([]);
       setScript("");
       setBestPicks({});
       setScriptError("");
+      setPasteMode(false);
+      setPasteText("");
+      setPasteSuccess("");
       setTab("answers");
       const url = `${window.location.origin}/show`;
       const qr = await QRCode.toDataURL(url, { width: 300, margin: 2 });
@@ -141,6 +160,52 @@ export default function AdminPage() {
     });
   }
 
+  function parsePastedAnswers(raw: string): string[][] {
+    const blocks = raw.trim().split(/\n[ \t]*\n+/);
+    return blocks
+      .map(block =>
+        block.split("\n")
+          .map(line => line.replace(/^\s*\d+[.):\-]\s*/, "").trim())
+          .filter(line => line.length > 0)
+      )
+      .filter(block => block.length > 0);
+  }
+
+  async function importPastedAnswers() {
+    if (!activeShow || questions.length === 0) return;
+    const parsed = parsePastedAnswers(pasteText);
+    if (parsed.length === 0) {
+      setPasteError("No answers found. Separate each person with a blank line.");
+      return;
+    }
+    const invalid = parsed.filter(p => p.length !== questions.length);
+    if (invalid.length > 0) {
+      setPasteError(`Each person needs exactly ${questions.length} answers. Found blocks with: ${parsed.map(p => p.length).join(", ")} answers.`);
+      return;
+    }
+    setPasteImporting(true);
+    setPasteError("");
+    for (const personAnswers of parsed) {
+      const rows = questions.map((q, i) => ({
+        show_id: activeShow.id,
+        question_id: q.id,
+        text: personAnswers[i],
+      }));
+      await supabase.from("answers").insert(rows);
+    }
+    // Reload all answers
+    const { data } = await supabase
+      .from("answers")
+      .select("*, questions(*)")
+      .eq("show_id", activeShow.id)
+      .order("submitted_at");
+    setAnswers((data as AnswerWithQuestion[]) ?? []);
+    setPasteSuccess(`Imported ${parsed.length} submission${parsed.length !== 1 ? "s" : ""}.`);
+    setPasteText("");
+    setPasteMode(false);
+    setPasteImporting(false);
+  }
+
   function printRef(ref: React.RefObject<HTMLDivElement | null>) {
     const win = window.open("", "_blank");
     if (!win || !ref.current) return;
@@ -154,6 +219,10 @@ export default function AdminPage() {
   }
 
   function printCrowdFavorites() {
+    if (!hasPicks) {
+      alert("Tap the circle buttons next to answers to select your crowd favorites first.");
+      return;
+    }
     const lines = Object.entries(grouped)
       .map(([qid, { question }]) => {
         const picks = bestPicks[Number(qid)] ?? [];
@@ -191,6 +260,7 @@ export default function AdminPage() {
     : 0;
 
   const hasPicks = Object.values(bestPicks).some(p => p.length > 0);
+  const parsedPreview = pasteText.trim() ? parsePastedAnswers(pasteText) : [];
 
   if (!authed) {
     return (
@@ -268,14 +338,53 @@ export default function AdminPage() {
 
           {tab === "answers" && (
             <div>
-              <div className="flex items-center justify-between mb-4">
-                <p className="text-gray-500 text-xs">Tap a number to pick crowd favorites (max 2 per question)</p>
-                <button
-                  onClick={() => printRef(answersRef)}
-                  className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-sm rounded-lg transition-colors">
-                  🖨 Print All
-                </button>
+              <div className="flex items-center justify-between mb-4 gap-2 flex-wrap">
+                <p className="text-gray-500 text-xs">Tap · to mark crowd favorites (max 2 per question)</p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => { setPasteMode(m => !m); setPasteError(""); setPasteSuccess(""); }}
+                    className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-sm rounded-lg transition-colors">
+                    {pasteMode ? "✕ Cancel" : "Paste Answers"}
+                  </button>
+                  <button
+                    onClick={() => printRef(answersRef)}
+                    className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-sm rounded-lg transition-colors">
+                    🖨 Print All
+                  </button>
+                </div>
               </div>
+
+              {pasteSuccess && (
+                <p className="text-green-400 text-sm bg-green-950 rounded-xl px-4 py-3 mb-4">{pasteSuccess}</p>
+              )}
+
+              {pasteMode && (
+                <div className="bg-gray-900 rounded-2xl p-5 mb-6 flex flex-col gap-3">
+                  <p className="text-gray-400 text-sm">
+                    Paste answers for multiple people. Separate each person with a <strong className="text-white">blank line</strong>.
+                    Each person needs <strong className="text-white">{questions.length} answers</strong>, one per line (numbered or not).
+                  </p>
+                  <textarea
+                    rows={14}
+                    value={pasteText}
+                    onChange={(e) => { setPasteText(e.target.value); setPasteError(""); }}
+                    placeholder={`Person 1:\n1. Their answer to Q1\n2. Their answer to Q2\n...\n\nPerson 2:\n1. Their answer to Q1\n...`}
+                    className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-amber-400 resize-none font-mono text-sm"
+                  />
+                  {parsedPreview.length > 0 && (
+                    <p className="text-amber-400 text-xs">
+                      Detected {parsedPreview.length} person{parsedPreview.length !== 1 ? "s" : ""} — {parsedPreview.map(p => p.length).join(", ")} answers each
+                    </p>
+                  )}
+                  {pasteError && <p className="text-red-400 text-sm">{pasteError}</p>}
+                  <button
+                    onClick={importPastedAnswers}
+                    disabled={pasteImporting || pasteText.trim().length === 0}
+                    className="py-3 bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-black font-bold rounded-xl transition-colors">
+                    {pasteImporting ? "Importing…" : `Import${parsedPreview.length > 0 ? ` (${parsedPreview.length} people)` : ""}`}
+                  </button>
+                </div>
+              )}
 
               <div ref={answersRef}>
                 {Object.values(grouped).length === 0 ? (
@@ -324,9 +433,13 @@ export default function AdminPage() {
                 )}
                 <button
                   onClick={printCrowdFavorites}
-                  disabled={!hasPicks}
-                  className="w-full py-6 bg-gray-900 hover:bg-gray-800 disabled:opacity-20 border-2 border-gray-600 hover:border-amber-500 rounded-2xl font-bold text-xl tracking-[0.2em] uppercase transition-all">
-                  Crowd Favorites
+                  disabled={answers.length === 0}
+                  className={`w-full py-6 rounded-2xl font-bold text-xl tracking-[0.2em] uppercase transition-all border-2 ${
+                    hasPicks
+                      ? "bg-gray-900 hover:bg-gray-800 border-amber-500 text-amber-400"
+                      : "bg-gray-900 hover:bg-gray-800 border-gray-600 hover:border-gray-500 text-gray-300 disabled:opacity-20"
+                  }`}>
+                  {hasPicks ? `Crowd Favorites ✓` : "Crowd Favorites"}
                 </button>
                 <button
                   onClick={generateScript}
