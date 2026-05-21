@@ -17,8 +17,10 @@ export default function AdminPage() {
   const [answers, setAnswers] = useState<AnswerWithQuestion[]>([]);
   const [script, setScript] = useState("");
   const [generating, setGenerating] = useState(false);
+  const [scriptError, setScriptError] = useState("");
   const [qrUrl, setQrUrl] = useState("");
   const [tab, setTab] = useState<"answers" | "script">("answers");
+  const [bestPicks, setBestPicks] = useState<Record<number, string[]>>({});
   const scriptRef = useRef<HTMLDivElement>(null);
   const answersRef = useRef<HTMLDivElement>(null);
 
@@ -35,7 +37,6 @@ export default function AdminPage() {
   useEffect(() => {
     if (!activeShow) return;
 
-    // Initial load
     supabase
       .from("answers")
       .select("*, questions(*)")
@@ -43,7 +44,6 @@ export default function AdminPage() {
       .order("submitted_at")
       .then(({ data }) => setAnswers((data as AnswerWithQuestion[]) ?? []));
 
-    // Load existing script
     supabase
       .from("scripts")
       .select("content")
@@ -51,7 +51,6 @@ export default function AdminPage() {
       .single()
       .then(({ data }) => { if (data) setScript(data.content); });
 
-    // Realtime subscription
     const channel = supabase
       .channel(`answers:${activeShow.id}`)
       .on("postgres_changes", {
@@ -88,9 +87,7 @@ export default function AdminPage() {
   }
 
   async function startShow(theme: Theme) {
-    // Deactivate any existing active shows
     await supabase.from("shows").update({ is_active: false }).eq("is_active", true);
-
     const code = Math.random().toString(36).substring(2, 8).toUpperCase();
     const { data } = await supabase
       .from("shows")
@@ -101,8 +98,9 @@ export default function AdminPage() {
       setActiveShow(data);
       setAnswers([]);
       setScript("");
+      setBestPicks({});
+      setScriptError("");
       setTab("answers");
-      // QR always points to the fixed /show URL — same code every show
       const url = `${window.location.origin}/show`;
       const qr = await QRCode.toDataURL(url, { width: 300, margin: 2 });
       setQrUrl(qr);
@@ -112,17 +110,35 @@ export default function AdminPage() {
   async function generateScript() {
     if (!activeShow) return;
     setGenerating(true);
-    const res = await fetch("/api/generate-script", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ showId: activeShow.id }),
-    });
-    const data = await res.json();
-    if (data.content) {
-      setScript(data.content);
-      setTab("script");
+    setScriptError("");
+    try {
+      const res = await fetch("/api/generate-script", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ showId: activeShow.id }),
+      });
+      const data = await res.json();
+      if (data.content) {
+        setScript(data.content);
+        setTab("script");
+      } else {
+        setScriptError(data.error ?? "Generation failed — check Vercel logs.");
+      }
+    } catch {
+      setScriptError("Request timed out or network error.");
     }
     setGenerating(false);
+  }
+
+  function togglePick(qid: number, answer: string) {
+    setBestPicks(prev => {
+      const current = prev[qid] ?? [];
+      if (current.includes(answer)) {
+        return { ...prev, [qid]: current.filter(a => a !== answer) };
+      }
+      if (current.length >= 2) return prev;
+      return { ...prev, [qid]: [...current, answer] };
+    });
   }
 
   function printRef(ref: React.RefObject<HTMLDivElement | null>) {
@@ -137,7 +153,32 @@ export default function AdminPage() {
     win.print();
   }
 
-  // Group answers by question
+  function printCrowdFavorites() {
+    const lines = Object.entries(grouped)
+      .map(([qid, { question }]) => {
+        const picks = bestPicks[Number(qid)] ?? [];
+        if (!picks.length) return "";
+        const items = picks
+          .map(a => `<p style="margin:4px 0 4px 24px; font-size:15px;">→ ${a}</p>`)
+          .join("");
+        return `<div style="margin-bottom:28px; page-break-inside:avoid;">
+          <p style="font-weight:bold; color:#444; font-size:12px; text-transform:uppercase; letter-spacing:1px; margin-bottom:6px;">${question}</p>
+          ${items}
+        </div>`;
+      })
+      .filter(Boolean)
+      .join("");
+
+    const win = window.open("", "_blank");
+    if (!win) return;
+    win.document.write(`<html><head><title>Crowd Favorites</title><style>
+      body { font-family: Georgia, serif; padding: 48px; max-width: 700px; margin: 0 auto; line-height: 1.8; }
+      h1 { font-size: 28px; letter-spacing: 4px; text-transform: uppercase; margin-bottom: 36px; border-bottom: 2px solid #000; padding-bottom: 14px; }
+    </style></head><body><h1>Crowd Favorites</h1>${lines}</body></html>`);
+    win.document.close();
+    win.print();
+  }
+
   const grouped = answers.reduce<Record<number, { question: string; answers: string[] }>>((acc, a) => {
     const qid = a.question_id;
     if (!acc[qid]) acc[qid] = { question: a.questions?.text ?? "", answers: [] };
@@ -145,12 +186,11 @@ export default function AdminPage() {
     return acc;
   }, {});
 
-  const respondents = new Set(
-    answers.map((a) => a.submitted_at.slice(0, 16) + a.show_id) // rough unique count
-  ).size;
   const uniqueSubmissions = answers.length > 0
     ? Math.round(answers.length / Object.keys(grouped).length)
     : 0;
+
+  const hasPicks = Object.values(bestPicks).some(p => p.length > 0);
 
   if (!authed) {
     return (
@@ -197,7 +237,6 @@ export default function AdminPage() {
         </div>
       ) : (
         <div>
-          {/* Show header */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
             <div>
               <p className="text-gray-400 text-sm">Active show</p>
@@ -214,7 +253,6 @@ export default function AdminPage() {
             )}
           </div>
 
-          {/* Tabs */}
           <div className="flex gap-2 mb-5">
             <button
               onClick={() => setTab("answers")}
@@ -224,19 +262,21 @@ export default function AdminPage() {
             <button
               onClick={() => setTab("script")}
               className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${tab === "script" ? "bg-amber-500 text-black" : "bg-gray-800 text-gray-300 hover:bg-gray-700"}`}>
-              Script {script ? "✓" : ""}
+              Final Draft {script ? "✓" : ""}
             </button>
           </div>
 
           {tab === "answers" && (
             <div>
-              <div className="flex justify-end mb-4">
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-gray-500 text-xs">Tap a number to pick crowd favorites (max 2 per question)</p>
                 <button
                   onClick={() => printRef(answersRef)}
                   className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-sm rounded-lg transition-colors">
-                  🖨 Print Answers
+                  🖨 Print All
                 </button>
               </div>
+
               <div ref={answersRef}>
                 {Object.values(grouped).length === 0 ? (
                   <p className="text-gray-500 text-center py-12">Waiting for audience answers…</p>
@@ -246,11 +286,31 @@ export default function AdminPage() {
                       <div key={qid} className="bg-gray-900 rounded-2xl p-5">
                         <p className="text-amber-400 font-semibold mb-3">{question}</p>
                         <div className="flex flex-col gap-2">
-                          {ans.map((a, i) => (
-                            <div key={i} className="bg-gray-800 rounded-xl px-4 py-2.5 text-gray-200 text-sm">
-                              {a}
-                            </div>
-                          ))}
+                          {ans.map((a, i) => {
+                            const picks = bestPicks[Number(qid)] ?? [];
+                            const pickIndex = picks.indexOf(a);
+                            const isSelected = pickIndex >= 0;
+                            return (
+                              <div key={i} className="flex items-center gap-2">
+                                <button
+                                  onClick={() => togglePick(Number(qid), a)}
+                                  className={`w-7 h-7 rounded-full text-xs font-bold flex-shrink-0 transition-all ${
+                                    isSelected
+                                      ? "bg-amber-500 text-black scale-110"
+                                      : "bg-gray-700 text-gray-500 hover:bg-gray-600 hover:text-gray-300"
+                                  }`}>
+                                  {isSelected ? pickIndex + 1 : "·"}
+                                </button>
+                                <div className={`flex-1 rounded-xl px-4 py-2.5 text-sm transition-colors ${
+                                  isSelected
+                                    ? "bg-amber-950 text-amber-100 border border-amber-800"
+                                    : "bg-gray-800 text-gray-200"
+                                }`}>
+                                  {a}
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
                     ))}
@@ -258,38 +318,56 @@ export default function AdminPage() {
                 )}
               </div>
 
-              <button
-                onClick={generateScript}
-                disabled={generating || answers.length === 0}
-                className="mt-8 w-full py-4 bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-black font-bold rounded-xl text-lg transition-colors">
-                {generating ? "Generating script…" : "✨ Generate Comedy Script"}
-              </button>
+              <div className="mt-10 flex flex-col gap-4">
+                {scriptError && (
+                  <p className="text-red-400 text-sm text-center bg-red-950 rounded-xl px-4 py-3">{scriptError}</p>
+                )}
+                <button
+                  onClick={printCrowdFavorites}
+                  disabled={!hasPicks}
+                  className="w-full py-6 bg-gray-900 hover:bg-gray-800 disabled:opacity-20 border-2 border-gray-600 hover:border-amber-500 rounded-2xl font-bold text-xl tracking-[0.2em] uppercase transition-all">
+                  Crowd Favorites
+                </button>
+                <button
+                  onClick={generateScript}
+                  disabled={generating || answers.length === 0}
+                  className="w-full py-6 bg-white hover:bg-gray-100 disabled:opacity-20 text-black rounded-2xl font-bold text-xl tracking-[0.2em] uppercase transition-all">
+                  {generating ? "Generating…" : "Final Draft"}
+                </button>
+              </div>
             </div>
           )}
 
           {tab === "script" && (
             <div>
               {!script ? (
-                <p className="text-gray-500 text-center py-12">No script yet — collect answers and generate.</p>
+                <div className="text-center py-12">
+                  <p className="text-gray-500 mb-6">No script yet — go back and hit Final Draft.</p>
+                  <button
+                    onClick={() => setTab("answers")}
+                    className="px-6 py-3 bg-gray-800 hover:bg-gray-700 rounded-xl text-sm transition-colors">
+                    ← Back
+                  </button>
+                </div>
               ) : (
                 <>
-                  <div className="flex justify-end mb-4">
-                    <button
-                      onClick={() => printRef(scriptRef)}
-                      className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-sm rounded-lg transition-colors">
-                      🖨 Print Script
-                    </button>
-                  </div>
-                  <div ref={scriptRef} className="bg-gray-900 rounded-2xl p-6">
-                    <h2 className="font-bold text-amber-400 text-lg mb-4">{activeShow.themes?.name} — Script</h2>
+                  <div ref={scriptRef} className="bg-gray-900 rounded-2xl p-6 mb-6">
+                    <h2 className="font-bold text-amber-400 text-lg mb-4">{activeShow.themes?.name} — Final Draft</h2>
                     <pre className="whitespace-pre-wrap text-gray-200 leading-relaxed font-serif text-base">{script}</pre>
                   </div>
-                  <button
-                    onClick={generateScript}
-                    disabled={generating}
-                    className="mt-4 px-6 py-3 bg-gray-800 hover:bg-gray-700 disabled:opacity-40 text-sm rounded-xl transition-colors">
-                    {generating ? "Regenerating…" : "↺ Regenerate"}
-                  </button>
+                  <div className="flex flex-col gap-3">
+                    <button
+                      onClick={() => printRef(scriptRef)}
+                      className="w-full py-6 bg-white hover:bg-gray-100 text-black rounded-2xl font-bold text-xl tracking-[0.2em] uppercase transition-all">
+                      Print Final Draft
+                    </button>
+                    <button
+                      onClick={generateScript}
+                      disabled={generating}
+                      className="w-full py-3 bg-gray-800 hover:bg-gray-700 disabled:opacity-40 text-sm rounded-xl transition-colors">
+                      {generating ? "Regenerating…" : "↺ Regenerate"}
+                    </button>
+                  </div>
                 </>
               )}
             </div>

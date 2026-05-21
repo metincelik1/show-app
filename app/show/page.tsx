@@ -89,20 +89,24 @@ export default function ShowPage() {
     );
   }
 
+  const theme = show?.themes;
+  const isTurkish = theme?.language === "tr";
+
   if (submitted) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen px-6 text-center">
         <div className="text-5xl mb-6">🎤</div>
-        <h1 className="text-3xl font-bold text-amber-400 mb-3">You're in the show!</h1>
+        <h1 className="text-3xl font-bold text-amber-400 mb-3">
+          {isTurkish ? "Teşekkürler!" : "Thanks!"}
+        </h1>
         <p className="text-gray-400 text-lg max-w-sm">
-          Your answers are submitted. Sit back and see if yours makes the script.
+          {isTurkish
+            ? "Cevapların alındı. İyi eğlenceler!"
+            : "Your answers are in. Enjoy the show!"}
         </p>
       </div>
     );
   }
-
-  const theme = show?.themes;
-  const isTurkish = theme?.language === "tr";
 
   return (
     <div className="max-w-lg mx-auto px-5 py-10">
@@ -112,9 +116,7 @@ export default function ShowPage() {
         </p>
         <h1 className="text-3xl font-bold">{theme?.name}</h1>
         <p className="text-gray-400 mt-2 text-sm">
-          {isTurkish
-            ? "Tüm soruları yanıtla — en iyi cevaplar bu gecenin komedi scriptine giriyor."
-            : "Answer all questions — the best ones make it into tonight's comedy script."}
+          {isTurkish ? "Aşağıdaki soruları yanıtla." : "Answer each question below."}
         </p>
       </div>
 

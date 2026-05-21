@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
+
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { supabase } from "@/lib/supabase";
 
@@ -71,8 +73,14 @@ ${qaBlock}
 Now write the complete script in the format described above.`;
 
   const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-  const result = await model.generateContent(prompt);
-  const content = result.response.text();
+  let content: string;
+  try {
+    const result = await model.generateContent(prompt);
+    content = result.response.text();
+  } catch (err) {
+    console.error("Gemini error:", err);
+    return NextResponse.json({ error: "Gemini API failed: " + String(err) }, { status: 500 });
+  }
 
   // Upsert script
   const { data: existing } = await supabase
