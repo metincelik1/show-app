@@ -139,6 +139,7 @@ export default function AdminPage() {
       const data = await res.json();
       if (data.content) {
         setScript(data.content);
+        if (data.crowdFavorites) setBestPicks(data.crowdFavorites);
         setTab("script");
       } else {
         setScriptError(data.error ?? "Generation failed — check Vercel logs.");
@@ -339,7 +340,7 @@ export default function AdminPage() {
           {tab === "answers" && (
             <div>
               <div className="flex items-center justify-between mb-4 gap-2 flex-wrap">
-                <p className="text-gray-500 text-xs">Tap · to mark crowd favorites (max 2 per question)</p>
+                <p className="text-gray-500 text-xs">Crowd favorites are auto-selected when you generate the script. Tap to override.</p>
                 <div className="flex gap-2">
                   <button
                     onClick={() => { setPasteMode(m => !m); setPasteError(""); setPasteSuccess(""); }}
