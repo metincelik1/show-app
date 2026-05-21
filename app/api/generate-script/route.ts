@@ -106,26 +106,27 @@ ${q.answers.map(a => `   - ${a}`).join("\n")}
     return `QUESTION: ${q.question}\nSELECTED ANSWER: ${bestAnswer}`;
   }).join("\n\n");
 
-  const scriptPrompt = `You are writing a SHORT, tight comedy script for stand-up comedian Metin Celik to read live on stage.
+  const scriptPrompt = `You are writing a tight comedy script for stand-up comedian Metin Celik to read live on stage.
 
 THEME: ${theme.name}
 FORMAT: ${theme.script_format}
 LANGUAGE: ${langNote}
 
-STRICT RULES:
-- The audience answers ARE the punchlines. Do not dilute or bury them.
-- Wrap every audience answer in **double asterisks** — the comedian uses this to know when to pause and emphasize.
-- Per answer: write ONE short setup sentence (max 15 words) → **the answer** → ONE short twist or callback (optional, max 10 words). That is all.
-- NO stage directions. NO "(pause)". NO "(laughter)". NO act-out instructions. NO parenthetical notes of any kind.
-- NO lengthy monologues. Every word you add must earn its place.
-- Total script should be roughly 10-15 lines. Short. Punchy. The answers carry the weight.
-- Build misdirection through unexpected CONNECTIONS between answers, not by adding filler sentences.
-- Spoken voice only — this will be read aloud exactly as written.
+GOAL: Every single audience answer must land as a punchline and get a laugh. All ${orderedQuestions.length} answers are used — none are wasted.
 
-SELECTED ANSWERS (one per question, in order):
+RULES:
+- Wrap every audience answer in **double asterisks** so the comedian knows to pause and emphasize it.
+- Per answer: one short setup (max 15 words) → **the answer** → optionally one short twist/callback (max 10 words).
+- The FORMAT above has a structure (sections, headers, bullet points, etc). Use that structure to add EXTRA laughs — funny section titles, absurd labels, escalating bureaucratic/WhatsApp/podcast language. These structural jokes are free real estate on top of the punchlines.
+- Every word of yours must either set up a punchline or land one. No filler, no transitions that don't add to the joke.
+- NO stage directions. NO "(pause)". NO act-out notes. NO parentheticals.
+- Spoken voice — this is read aloud exactly as written.
+- Build to an absurd escalation. The last answer should feel like the biggest moment.
+
+SELECTED ANSWERS:
 ${scriptQA}
 
-Write the script now. Keep it tight.`;
+Write it now. Every answer gets its laugh.`;
 
   let content: string;
   try {
