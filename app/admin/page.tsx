@@ -209,7 +209,7 @@ export default function AdminPage() {
             {qrUrl && (
               <div className="flex flex-col items-center gap-2">
                 <img src={qrUrl} alt="QR Code" className="w-28 h-28 rounded-xl" />
-                <p className="text-xs text-gray-500">show.metincelik.net/show</p>
+                <p className="text-xs text-gray-500">finaldraft.metincelik.net/show</p>
               </div>
             )}
           </div>
