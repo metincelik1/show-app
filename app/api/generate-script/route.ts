@@ -106,24 +106,26 @@ ${q.answers.map(a => `   - ${a}`).join("\n")}
     return `QUESTION: ${q.question}\nSELECTED ANSWER: ${bestAnswer}`;
   }).join("\n\n");
 
-  const scriptPrompt = `You are a comedy writer helping a stand-up comedian named Metin Celik craft an absurd, funny script for a live audience show.
+  const scriptPrompt = `You are writing a SHORT, tight comedy script for stand-up comedian Metin Celik to read live on stage.
 
 THEME: ${theme.name}
-OUTPUT FORMAT: ${theme.script_format}
+FORMAT: ${theme.script_format}
+LANGUAGE: ${langNote}
 
-INSTRUCTIONS:
-- Use the selected answers below — these are the best ones already chosen for you.
-- Lightly rephrase for comedic flow but keep the spirit intact.
-- Use misdirection, absurdity, and unexpected twists. Keep it clean.
-- Build tension and release throughout. Escalate in absurdity toward the end.
-- Write in a natural spoken voice — the comedian will read this aloud on stage.
-- Use generous line breaks for easy on-stage reading.
-- ${langNote}
+STRICT RULES:
+- The audience answers ARE the punchlines. Do not dilute or bury them.
+- Wrap every audience answer in **double asterisks** — the comedian uses this to know when to pause and emphasize.
+- Per answer: write ONE short setup sentence (max 15 words) → **the answer** → ONE short twist or callback (optional, max 10 words). That is all.
+- NO stage directions. NO "(pause)". NO "(laughter)". NO act-out instructions. NO parenthetical notes of any kind.
+- NO lengthy monologues. Every word you add must earn its place.
+- Total script should be roughly 10-15 lines. Short. Punchy. The answers carry the weight.
+- Build misdirection through unexpected CONNECTIONS between answers, not by adding filler sentences.
+- Spoken voice only — this will be read aloud exactly as written.
 
-SELECTED ANSWERS:
+SELECTED ANSWERS (one per question, in order):
 ${scriptQA}
 
-Now write the complete script in the format described above.`;
+Write the script now. Keep it tight.`;
 
   let content: string;
   try {

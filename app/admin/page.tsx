@@ -467,7 +467,13 @@ export default function AdminPage() {
                 <>
                   <div ref={scriptRef} className="bg-gray-900 rounded-2xl p-6 mb-6">
                     <h2 className="font-bold text-amber-400 text-lg mb-4">{activeShow.themes?.name} — Final Draft</h2>
-                    <pre className="whitespace-pre-wrap text-gray-200 leading-relaxed font-serif text-base">{script}</pre>
+                    <div className="whitespace-pre-wrap text-gray-200 leading-relaxed font-serif text-base">
+                      {script.split(/\*\*(.*?)\*\*/g).map((part, i) =>
+                        i % 2 === 1
+                          ? <strong key={i} className="text-white font-bold bg-amber-500/20 px-0.5 rounded">{part}</strong>
+                          : <span key={i}>{part}</span>
+                      )}
+                    </div>
                   </div>
                   <div className="flex flex-col gap-3">
                     <button
