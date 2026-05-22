@@ -22,6 +22,7 @@ export default function AdminPage() {
   const [qrUrl, setQrUrl] = useState("");
   const [tab, setTab] = useState<"answers" | "script">("answers");
   const [bestPicks, setBestPicks] = useState<Record<number, string[]>>({});
+  const [bestAnswers, setBestAnswers] = useState<Record<number, string>>({});
 
   const [ranking, setRanking] = useState(false);
   const [pasteMode, setPasteMode] = useState(false);
@@ -116,6 +117,7 @@ export default function AdminPage() {
       setQuestions([]);
       setScript("");
       setBestPicks({});
+      setBestAnswers({});
       setScriptError("");
       setPasteMode(false);
       setPasteText("");
@@ -135,7 +137,7 @@ export default function AdminPage() {
       const res = await fetch("/api/generate-script", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ showId: activeShow.id }),
+        body: JSON.stringify({ showId: activeShow.id, bestAnswers }),
       });
       const data = await res.json();
       if (data.content) {
@@ -233,6 +235,7 @@ export default function AdminPage() {
         const data = await res.json();
         if (data.crowdFavorites) {
           setBestPicks(data.crowdFavorites);
+          if (data.bestAnswers) setBestAnswers(data.bestAnswers);
           printCrowdFavoritesWithPicks(data.crowdFavorites);
         }
       } catch {

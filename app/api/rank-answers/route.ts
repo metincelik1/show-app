@@ -71,12 +71,15 @@ ${orderedQuestions.map(q => `${q.idx}. QUESTION: ${q.question}\nANSWERS:\n${q.an
   }
 
   const crowdFavorites: Record<number, string[]> = {};
+  const bestAnswers: Record<number, string> = {};
+
   for (const pick of picks) {
     const q = orderedQuestions.find(oq => oq.idx === pick.i);
     if (!q) continue;
+    if (pick.best) bestAnswers[q.qid] = pick.best;
     const faves = [pick.second, pick.third].filter(a => a && a.length > 0);
     if (faves.length > 0) crowdFavorites[q.qid] = faves;
   }
 
-  return NextResponse.json({ crowdFavorites });
+  return NextResponse.json({ crowdFavorites, bestAnswers });
 }
