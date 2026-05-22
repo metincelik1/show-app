@@ -23,6 +23,7 @@ export default function AdminPage() {
   const [tab, setTab] = useState<"answers" | "script">("answers");
   const [bestPicks, setBestPicks] = useState<Record<number, string[]>>({});
 
+  const [ranking, setRanking] = useState(false);
   const [pasteMode, setPasteMode] = useState(false);
   const [pasteText, setPasteText] = useState("");
   const [pasteError, setPasteError] = useState("");
@@ -219,16 +220,36 @@ export default function AdminPage() {
     win.print();
   }
 
-  function printCrowdFavorites() {
+  async function handleCrowdFavorites() {
     if (!hasPicks) {
-      alert("Tap the circle buttons next to answers to select your crowd favorites first.");
+      if (!activeShow) return;
+      setRanking(true);
+      try {
+        const res = await fetch("/api/rank-answers", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ showId: activeShow.id }),
+        });
+        const data = await res.json();
+        if (data.crowdFavorites) {
+          setBestPicks(data.crowdFavorites);
+          printCrowdFavoritesWithPicks(data.crowdFavorites);
+        }
+      } catch {
+        // ignore
+      }
+      setRanking(false);
       return;
     }
+    printCrowdFavoritesWithPicks(bestPicks);
+  }
+
+  function printCrowdFavoritesWithPicks(favs: Record<number, string[]>) {
     const lines = Object.entries(grouped)
       .map(([qid, { question }]) => {
-        const picks = bestPicks[Number(qid)] ?? [];
-        if (!picks.length) return "";
-        const items = picks
+        const qPicks = favs[Number(qid)] ?? [];
+        if (!qPicks.length) return "";
+        const items = qPicks
           .map(a => `<p style="margin:4px 0 4px 24px; font-size:15px;">→ ${a}</p>`)
           .join("");
         return `<div style="margin-bottom:28px; page-break-inside:avoid;">
@@ -433,14 +454,14 @@ export default function AdminPage() {
                   <p className="text-red-400 text-sm text-center bg-red-950 rounded-xl px-4 py-3">{scriptError}</p>
                 )}
                 <button
-                  onClick={printCrowdFavorites}
-                  disabled={answers.length === 0}
+                  onClick={handleCrowdFavorites}
+                  disabled={ranking || answers.length === 0}
                   className={`w-full py-6 rounded-2xl font-bold text-xl tracking-[0.2em] uppercase transition-all border-2 ${
                     hasPicks
                       ? "bg-gray-900 hover:bg-gray-800 border-amber-500 text-amber-400"
                       : "bg-gray-900 hover:bg-gray-800 border-gray-600 hover:border-gray-500 text-gray-300 disabled:opacity-20"
                   }`}>
-                  {hasPicks ? `Crowd Favorites ✓` : "Crowd Favorites"}
+                  {ranking ? "Ranking…" : hasPicks ? "Crowd Favorites ✓" : "Crowd Favorites"}
                 </button>
                 <button
                   onClick={generateScript}
