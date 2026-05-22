@@ -245,15 +245,22 @@ export default function AdminPage() {
   }
 
   function printCrowdFavoritesWithPicks(favs: Record<number, string[]>) {
-    const lines = Object.entries(grouped)
-      .map(([qid, { question }]) => {
-        const qPicks = favs[Number(qid)] ?? [];
+    const ranks = ["2nd Best", "3rd Best"];
+    const orderedQs = questions.length > 0
+      ? questions
+      : Object.entries(grouped).map(([qid, { question }]) => ({ id: Number(qid), text: question }));
+
+    const lines = orderedQs
+      .map((q, idx) => {
+        const qid = "id" in q ? q.id : Number((q as { id: number }).id);
+        const qText = "text" in q ? q.text : grouped[qid]?.question ?? "";
+        const qPicks = favs[qid] ?? [];
         if (!qPicks.length) return "";
         const items = qPicks
-          .map(a => `<p style="margin:4px 0 4px 24px; font-size:15px;">→ ${a}</p>`)
+          .map((a, i) => `<p style="margin:6px 0 6px 24px; font-size:15px;"><span style="font-size:11px;font-weight:bold;color:#888;text-transform:uppercase;letter-spacing:1px;margin-right:8px;">${ranks[i] ?? `Pick ${i + 1}`}</span>${a}</p>`)
           .join("");
         return `<div style="margin-bottom:28px; page-break-inside:avoid;">
-          <p style="font-weight:bold; color:#444; font-size:12px; text-transform:uppercase; letter-spacing:1px; margin-bottom:6px;">${question}</p>
+          <p style="font-weight:bold; color:#444; font-size:12px; text-transform:uppercase; letter-spacing:1px; margin-bottom:4px;">Q${idx + 1}. ${qText}</p>
           ${items}
         </div>`;
       })
